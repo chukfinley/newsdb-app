@@ -1,0 +1,76 @@
+name: newsdb_app
+description: "newsdb — Nachrichten aus vielen Haeusern, mit dem Lagerspiegel dazu."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Identitaet. Die Grenze aus A148: Konten, Rollen und Abos liegen in Convex,
+  # Artikel auf dem VPS. Das Paket liefert den Client samt Token-Erneuerung;
+  # die Passwort-Anmeldung selbst ist eine Convex-Action (`auth:signIn`), weil
+  # `@convex-dev/auth` sie so anbietet.
+  convex_flutter: ^3.0.1
+
+  # Alles Redaktionelle kommt ueber `news.chuk.dev/api`. `http` und nicht `dio`:
+  # gebraucht werden GET mit einem Kopf und JSON zurueck, dafuer ist die
+  # groessere Bibliothek nur mehr Abhaengigkeit.
+  http: ^1.6.0
+
+  # Bilder. Der Zwischenspeicher ist hier kein Komfort, sondern der
+  # Unterschied zwischen einer Titelseite, die beim Zurueckblaettern erneut
+  # laedt, und einer, die es nicht tut.
+  cached_network_image: ^3.4.1
+
+  # Einstellungen: Themenauswahl, Tag/Nacht, Push-Modus.
+  shared_preferences: ^2.5.5
+
+  # Der Refresh-Token gehoert nicht in `shared_preferences` — dort liegt er im
+  # Klartext im App-Verzeichnis. Keystore auf Android, Keychain auf iOS.
+  flutter_secure_storage: ^11.0.0
+
+  # „vor 20 Minuten", Datumsformate auf Deutsch.
+  intl: ^0.20.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/fonts/
+
+  # Die vier Schriften des Blattes, dieselben wie im Web. Gebuendelt und nicht
+  # von einem CDN geholt — aus demselben Grund wie dort: kein Abruf bei einem
+  # Dritten, nur weil jemand die Titelseite oeffnet.
+  #
+  # Alle vier sind **variable** Schriften: eine Datei traegt jedes Gewicht.
+  # Deshalb steht hier bewusst **kein** `weight:` — eine Gewichtsangabe wuerde
+  # Flutter dazu bringen, fuer andere Gewichte zu synthetisieren (also fett zu
+  # rechnen), statt die Achse der Schrift zu benutzen. Gesteuert wird ueber
+  # `fontVariations` in `lib/design/typografie.dart`, und nur so trifft man
+  # Gewicht 620, das `.headline` im CSS verlangt.
+  fonts:
+    - family: Newsreader
+      fonts:
+        - asset: assets/fonts/Newsreader-VF.ttf
+        - asset: assets/fonts/Newsreader-Italic-VF.ttf
+          style: italic
+    - family: SourceSerif4
+      fonts:
+        - asset: assets/fonts/SourceSerif4-VF.ttf
+        - asset: assets/fonts/SourceSerif4-Italic-VF.ttf
+          style: italic
+    - family: Archivo
+      fonts:
+        - asset: assets/fonts/Archivo-VF.ttf
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-VF.ttf

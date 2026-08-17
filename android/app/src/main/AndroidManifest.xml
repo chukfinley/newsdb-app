@@ -1,6 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- OHNE DIESE ZEILE HAT DIE FERTIGE APP KEIN NETZ.
+
+         Flutter traegt `INTERNET` nur in `debug/` und `profile/` ein, nicht
+         hier. Beim Entwickeln faellt das nie auf: Debug-Buendel haben die
+         Berechtigung, und erst das Release-APK startet sauber und scheitert
+         danach an jedem einzelnen Abruf. Diese App besteht aus Abrufen.
+
+         Bewusst **nur** diese eine Berechtigung. `ACCESS_NETWORK_STATE` waere
+         naheliegend ("kein Netz" erkennen), sagt aber nichts, was ein
+         fehlgeschlagener Abruf nicht auch sagt — und eine Berechtigung ohne
+         Gegenwert widerspricht dem, wofuer diese App antritt.
+         `POST_NOTIFICATIONS` kommt mit A161, wenn es etwas zu benachrichtigen
+         gibt, und keinen Tag frueher. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
-        android:label="newsdb_app"
+        android:label="newsdb"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

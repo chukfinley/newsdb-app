@@ -34,9 +34,21 @@ android {
 
     buildTypes {
         release {
-            // TODO: eigener Signaturschluessel, bevor irgendetwas veroeffentlicht
-            // wird. Bis dahin die Debug-Schluessel, damit `--release` baut.
-            signingConfig = signingConfigs.getByName("debug")
+            // **Unsigniert, ausdruecklich.** Ansage vom 17.8.2026: „ein unsigned
+            // release ok kein debug".
+            //
+            // Flutters Vorgabe waere `signingConfigs.getByName("debug")` — ein
+            // Release-Buendel, das mit dem Debug-Schluessel unterschrieben ist.
+            // Das ist bequem und irrefuehrend: es sieht aus wie ein fertiges
+            // APK, traegt aber einen Schluessel, den jede Flutter-Installation
+            // auf der Welt hat. Ein spaeterer Wechsel auf den echten Schluessel
+            // zwingt danach jeden Nutzer zur Deinstallation, weil Android eine
+            // App mit anderer Signatur nicht als dieselbe erkennt.
+            //
+            // `null` heisst: Gradle legt `app-release-unsigned.apk` ab. Das
+            // laesst sich **nicht** ohne Weiteres installieren — genau das ist
+            // der ehrliche Zustand, solange es keinen eigenen Schluessel gibt.
+            signingConfig = null
         }
     }
 }

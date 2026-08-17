@@ -140,8 +140,17 @@ class NewsdbApi {
 
   Map<String, Haus>? _haeuser;
 
-  /// Die Adresse eines Bildes. Die API liefert Kennungen, kein fertiges URL.
-  String bildAdresse(String bildId) => '${Adressen.api}/api/images/$bildId';
+  /// **Absichtlich nicht vorhanden: ein Weg über `/api/images/{id}`.**
+  ///
+  /// Er wäre naheliegend, weil ein Artikel `lead_image_id` trägt. Gemessen am
+  /// 17.8.2026: die Route verlangt ein Token (ohne: 401) und antwortet dann
+  /// mit `307` auf die Adresse **beim Verlag**. Dart entfernt beim Verfolgen
+  /// einer Weiterleitung den `Authorization`-Kopf nicht — unser JWT ginge also
+  /// an jedes Haus, dessen Bild jemand ansieht.
+  ///
+  /// Gebraucht wird die Route auch nicht: die Antworten tragen die
+  /// Verlagsadresse schon (`images[].url`, bei den Kacheln `image`). Siehe
+  /// `_aufmacherbild` in `modelle.dart`.
 
   /// Was darf dieses Gerät gerade sehen (`/api/stufe`)?
   ///

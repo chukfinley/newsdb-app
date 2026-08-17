@@ -126,7 +126,7 @@ class Aufmacher extends StatelessWidget {
           const SizedBox(height: Mass.block),
           Lagerspiegel(verteilung: kachel.lagerVerteilung, hoehe: rang.balken),
           const SizedBox(height: Mass.knapp),
-          const Lagerlegende(),
+          Lagerkuerzel(verteilung: kachel.lagerVerteilung),
           const SizedBox(height: Mass.knapp),
           FehlendeLager(verteilung: kachel.lagerVerteilung),
           _Dreiklang(
@@ -296,9 +296,33 @@ class Storykachel extends StatelessWidget {
           const SizedBox(height: Mass.normal),
           Lagerspiegel(verteilung: kachel.lagerVerteilung, hoehe: rang.balken),
           const SizedBox(height: Mass.knapp),
-          // Nur die Zeit. Der Hausname stand hier bis zum 16.8. daneben — bei
-          // 24 berichtenden Häusern sagt „welches zuerst" nichts.
-          Zeit(kachel.zuletzt),
+          // Die Kürzel mit ihren Zahlen unter jeder Kachel, nicht nur unter dem
+          // Aufmacher (Ansage vom 17.8.2026). Der Balken zeigt das Verhältnis,
+          // erst die Zahl sagt, ob eine Schieflage Zufall oder Befund ist.
+          Lagerkuerzel(
+            verteilung: kachel.lagerVerteilung,
+            klein: rang == Kachelrang.zeile,
+          ),
+          const SizedBox(height: Mass.eng),
+          Row(
+            children: [
+              // Der Hausname stand hier bis zum 16.8. — bei 24 berichtenden
+              // Häusern sagt „welches zuerst" nichts. Die **Anzahl** sagt etwas.
+              Text(
+                '${kachel.anzahlHaeuser} Häuser · ${kachel.anzahlArtikel} Berichte',
+                style: Stil.meta.copyWith(color: blatt.tinteGedaempft),
+              ),
+              // Der Trenner nur, wenn danach wirklich etwas steht. Ein Artikel
+              // ohne Datum kommt vor, und ein Punkt am Zeilenende sieht aus wie
+              // ein Fehler.
+              if (kachel.zuletzt != null) ...[
+                const SizedBox(width: Mass.knapp),
+                Text('·', style: Stil.meta.copyWith(color: blatt.tinteBlass)),
+                const SizedBox(width: Mass.knapp),
+                Zeit(kachel.zuletzt),
+              ],
+            ],
+          ),
         ],
       ),
     );

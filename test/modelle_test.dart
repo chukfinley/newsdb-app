@@ -157,6 +157,37 @@ void main() {
       expect(Schranke.gezaehlt.gesperrt, isTrue);
     });
 
+    test('Aufmacherbild kommt aus images[].url, nie aus lead_image_id', () {
+      // Der Fallstrick, gemessen am 17.8.2026 an einem echten Artikel:
+      // `lead_image_id` ist eine Kennung, keine Adresse. Wer sie an ein
+      // Bild-Widget gibt, bekommt stumm „kein Bild".
+      final a = Artikel.vonJson({
+        ...grund,
+        'lead_image_id': 'ea1ba24c1c7171b5af644af6',
+        'images': [
+          {'id': 'zzz', 'role': 'inline', 'url': 'https://haus.de/klein.jpg'},
+          {
+            'id': 'ea1ba24c1c7171b5af644af6',
+            'role': 'lead',
+            'url': 'https://haus.de/gross.jpg',
+          },
+        ],
+      });
+      expect(a.bild, 'https://haus.de/gross.jpg');
+    });
+
+    test('ohne images bleibt die Kennung draussen', () {
+      final a = Artikel.vonJson({...grund, 'lead_image_id': 'abc123'});
+      // Lieber kein Bild als eine Kennung, die als Adresse ins Netz geht.
+      expect(a.bild, isNull);
+    });
+
+    test('der Listenweg liefert lead_image als fertige Adresse', () {
+      final a =
+          Artikel.vonJson({...grund, 'lead_image': 'https://haus.de/t.jpg'});
+      expect(a.bild, 'https://haus.de/t.jpg');
+    });
+
     test('mehrDahinter unterscheidet Lesestufe von Bezahlschranke', () {
       // Volltext da: nichts dahinter, egal was `truncated` sagt.
       expect(

@@ -283,7 +283,7 @@ class Artikel {
             (json['authors'] as List?)?.whereType<String>().toList() ?? const [],
         ressort: json['section'] as String?,
         veroeffentlicht: _zeit(json['published_at']),
-        bild: json['lead_image_id'] as String? ?? json['lead_image'] as String?,
+        bild: _aufmacherbild(json),
         schranke: Schranke.vonJson(json['paywall']),
         abgeschnitten: json['truncated'] == true || json['truncated'] == 1,
         woerter: (json['word_count'] as num?)?.toInt() ?? 0,
@@ -334,6 +334,43 @@ class Artikel {
 
   /// Steht hinter dem, was wir zeigen, noch mehr?
   bool get mehrDahinter => text == null && (textGekuerzt || abgeschnitten);
+}
+
+/// Die Adresse des Aufmacherbilds eines Artikels.
+///
+/// **`lead_image_id` ist eine Kennung, keine Adresse** — anders als `image` bei
+/// den Kacheln der Titelseite, wo eine fertige Verlags-URL steht. Wer die
+/// Kennung an ein Bild-Widget gibt, bekommt „kein Bild", ohne dass etwas
+/// meldet, dass es kaputt ist. Gemessen am 17.8.2026 an einem echten Artikel:
+/// `lead_image_id: ea1ba24c1c7171b5af644af6`.
+///
+/// Die Kennung liesse sich über `/api/images/{id}` auflösen — **und genau das
+/// tut diese App bewusst nicht.** Der Weg verlangt ein Token und antwortet mit
+/// `307` auf die Adresse beim Verlag. Dart entfernt beim Verfolgen einer
+/// Weiterleitung den `Authorization`-Kopf nicht, also ginge unser JWT an
+/// merkur.de, spiegel.de und jedes andere Haus, dessen Bild jemand ansieht.
+///
+/// Die Antwort enthält die Adresse ohnehin schon: `images` trägt je Eintrag
+/// `url` und `role`. Also von dort, ohne Umweg und ohne Token — genauso wie
+/// das Web es macht.
+String? _aufmacherbild(Map<String, dynamic> json) {
+  final bilder = (json['images'] as List?)?.whereType<Map>().toList();
+  if (bilder == null || bilder.isEmpty) {
+    // Der Listenweg (`/api/articles`) liefert statt `images` ein fertiges
+    // `lead_image`. Das ist eine Adresse und darf direkt durch.
+    return json['lead_image'] as String?;
+  }
+  final kennung = json['lead_image_id'] as String?;
+  Map? treffer;
+  for (final bild in bilder) {
+    if (kennung != null && bild['id'] == kennung) {
+      treffer = bild;
+      break;
+    }
+    treffer ??= bild['role'] == 'lead' ? bild : null;
+  }
+  final url = (treffer ?? bilder.first)['url'];
+  return url is String && url.isNotEmpty ? url : null;
 }
 
 /// Zeitangaben der API sind ISO-8601 in UTC, manchmal `null`, gelegentlich

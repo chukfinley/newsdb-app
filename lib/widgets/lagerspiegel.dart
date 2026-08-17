@@ -208,25 +208,81 @@ class Lagerpunkt extends StatelessWidget {
   }
 }
 
-/// Die Legende unter dem Balken — nur beim Aufmacher, wo Platz dafuer ist.
-class Lagerlegende extends StatelessWidget {
-  const Lagerlegende({super.key});
+/// Die Kuerzel je Lager mit ihrer Zahl: **l 3 · m 26 · r 18**, jedes in seiner
+/// Farbe.
+///
+/// Loest die alte Legende ab, die nur „links Mitte rechts" mit drei Punkten
+/// zeigte. Ansage vom 17.8.2026: „r fuer rechts, m fuer Mitte, l fuer links in
+/// den Farben" und mehr Angaben schon auf der Titelseite.
+///
+/// **Der Gewinn ist die Zahl, nicht der Buchstabe.** Ein Balken zeigt
+/// Verhaeltnisse; ob dahinter 3 Haeuser stehen oder 300, sieht man ihm nicht
+/// an. Genau das entscheidet aber, wie ernst eine Schieflage zu nehmen ist:
+/// zwei zu eins ist Zufall, zwanzig zu eins ist ein Befund.
+///
+/// **Ein Lager mit null Berichten wird gezeigt, nicht weggelassen** — als
+/// blasse Null. Das Fehlen ist die Aussage, um die es geht; ein weggelassenes
+/// Kuerzel waere genau die Luecke, die niemand bemerkt.
+class Lagerkuerzel extends StatelessWidget {
+  const Lagerkuerzel({
+    required this.verteilung,
+    this.klein = false,
+    super.key,
+  });
+
+  /// Die Fuenf-Stufen-Verteilung aus der API.
+  final Map<String, dynamic>? verteilung;
+
+  /// Fuer die kleineren Kachelraenge: enger gesetzt, kleinere Schrift.
+  final bool klein;
 
   @override
   Widget build(BuildContext context) {
     final blatt = Blatt.of(context);
-    return Row(
+    final v = lagerVerteilung(verteilung);
+    final summe = v.values.fold<int>(0, (a, b) => a + b);
+    if (summe == 0) return const SizedBox.shrink();
+
+    return Wrap(
+      spacing: klein ? Mass.knapp : Mass.normal,
+      runSpacing: 2,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        for (final lager in lagerFolge) ...[
-          Lagerpunkt(lager: lager, groesse: 7),
-          const SizedBox(width: 5),
-          Text(
-            lagerKurz[lager]!,
-            style: Stil.meta.copyWith(color: blatt.tinteGedaempft),
+        for (final lager in lagerFolge)
+          Semantics(
+            label: '${v[lager]} aus ${lagerLang[lager]}',
+            excludeSemantics: true,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  lagerBuchstabe[lager]!,
+                  style: Stil.kicker.copyWith(
+                    // Der Buchstabe traegt die Farbe des Lagers. Die Mitte ist
+                    // in beiden Ausgaben ein helles Grau — als Schrift auf
+                    // Papier waere sie kaum zu lesen, deshalb dort die
+                    // gedaempfte Tinte statt der Balkenfarbe.
+                    color: lager == 'center'
+                        ? blatt.tinteGedaempft
+                        : blatt.lager(lager),
+                    fontSize: klein ? 10 : 11,
+                  ),
+                ),
+                const SizedBox(width: 3),
+                Text(
+                  '${v[lager]}',
+                  style: Stil.zahl.copyWith(
+                    fontSize: klein ? 11 : 12,
+                    color: v[lager] == 0 ? blatt.tinteBlass : blatt.tinte,
+                  ),
+                ),
+              ],
+            ),
           ),
-          if (lager != 'right') const SizedBox(width: Mass.normal),
-        ],
       ],
     );
   }
 }
+
+/// Die Buchstaben, mit denen die Lager beschriftet werden.
+const lagerBuchstabe = {'left': 'L', 'center': 'M', 'right': 'R'};

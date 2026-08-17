@@ -146,7 +146,7 @@ class _Inhalt extends StatelessWidget {
           zahlen: true,
         ),
         const SizedBox(height: Mass.knapp),
-        const Lagerlegende(),
+        Lagerkuerzel(verteilung: story.lagerVerteilung),
 
         if (fehlt.isNotEmpty) ...[
           const SizedBox(height: Mass.block),

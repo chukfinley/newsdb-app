@@ -170,7 +170,7 @@ class _Muster extends StatelessWidget {
                 zahlen: true,
               ),
               const SizedBox(height: Mass.knapp),
-              const Lagerlegende(),
+              Lagerkuerzel(verteilung: _breit.lagerVerteilung),
               const SizedBox(height: Mass.kachel),
 
               Text(

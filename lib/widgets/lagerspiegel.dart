@@ -110,6 +110,7 @@ class Lagerspiegel extends StatelessWidget {
       // behaupten, es sei ausgewogen berichtet worden.
       return SizedBox(
         height: hoehe,
+        width: double.infinity,
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: blatt.stufeUnbekannt,
@@ -123,9 +124,26 @@ class Lagerspiegel extends StatelessWidget {
       label: _vorlesen(teile, summe, kompakt),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(hoehe / 2),
+        // Zwei Masse, die beide noetig sind, und beide aus demselben Grund:
+        // ohne sie ist der Balken **unsichtbar**, ohne dass irgendetwas
+        // schiefgeht.
+        //
+        // * `width: double.infinity` — in einer `Column` mit
+        //   `crossAxisAlignment.start` bekommt das Kind lockere Breitenmasse,
+        //   und eine `SizedBox` ohne Breite nimmt sich davon die kleinste.
+        // * `CrossAxisAlignment.stretch` — eine `Row` gibt ihren Kindern
+        //   standardmaessig lockere **Hoehe**, und `ColoredBox` **ohne Kind**
+        //   nimmt sich davon ebenfalls die kleinste, also null. Im
+        //   ausfuehrlichen Modus faellt das nicht auf: dort steht eine Ziffer
+        //   im Segment, und mit Kind hat die Flaeche eine Hoehe.
+        //
+        // Gefunden am 17.8.2026 im Golden-Test — auf jeder Kachel fehlte der
+        // Balken, im ausfuehrlichen Modus war er da.
         child: SizedBox(
           height: hoehe,
+          width: double.infinity,
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (final (name, n, farbe) in teile)
                 if (n > 0)

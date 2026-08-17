@@ -6,7 +6,15 @@ plugins {
 
 android {
     namespace = "dev.chuk.newsdb_app"
-    compileSdk = flutter.compileSdkVersion
+
+    // Gemessen am 17.8.2026: `flutter.compileSdkVersion` steht bei dieser
+    // Flutter-Fassung auf 36, `flutter_secure_storage` verlangt aber 37 und
+    // bricht den Build ab ("requires Android SDK version 37 or higher").
+    // Deshalb hier fest 37 statt der Vorgabe. Das ist reines Kompilieren gegen
+    // die neuere Schnittstelle und aendert nichts daran, ab welcher
+    // Android-Fassung die App laeuft — das entscheidet `minSdk`.
+    compileSdk = 37
+
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -15,24 +23,19 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "dev.chuk.newsdb_app"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
-        // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
-        // You can force using the value of versionCode by specifying the `-P force-version-code-ignoring-abi=true`
-        // flag during build.
+        // is added automatically by Flutter.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // TODO: eigener Signaturschluessel, bevor irgendetwas veroeffentlicht
+            // wird. Bis dahin die Debug-Schluessel, damit `--release` baut.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

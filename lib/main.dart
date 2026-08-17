@@ -1,22 +1,39 @@
 /// newsdb — die App.
 ///
-/// Was hier gerade steht, ist die **Musterseite**: alle uebernommenen
-/// Design-Bausteine auf einem Bildschirm, zum Nebeneinanderhalten mit
-/// https://news.65.109.85.231.sslip.io. Sie ist mit Absicht der erste
-/// lauffaehige Zustand — das Design ist die Abnahme von A160, und eine Abnahme
-/// braucht etwas, das man ansehen kann.
+/// Der Aufbau ist absichtlich klein: **ein** globaler Zustand (angemeldet oder
+/// nicht), und die App baut sich neu, sobald er sich ändert. Kein
+/// Zustandspaket, kein Router mit Pfaden — die Navigation dieser App ist ein
+/// Stapel aus vier Ansichten.
 ///
-/// Die Titelseite mit echten Daten kommt als naechstes und ersetzt sie.
+/// **A152, Beta-Modus: ohne Anmeldung nichts.** Das Tor liegt hier, über allem
+/// anderen, aus demselben Grund wie im Web: eine Umleitung *innerhalb* der
+/// Zeitung würde erst die Titelseite bauen, und die holt sofort ihre Daten — in
+/// der Beta drei Abrufe mit 401, bevor überhaupt jemand ein Anmeldeformular
+/// sieht. **Sicherheit ist es nicht:** die Sperre sitzt in `newsdb/api.py` und
+/// ist von hier aus nicht zu umgehen. Dieses Tor erspart dem Nichtangemeldeten
+/// nur den Anblick leerer Kästen.
 library;
 
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
-import 'design/papier.dart';
+import 'api/client.dart';
+import 'auth/konto.dart';
 import 'design/thema.dart';
 import 'design/typografie.dart';
-import 'widgets/lagerspiegel.dart';
+import 'routen/anmelden.dart';
+import 'routen/artikel.dart';
+import 'routen/story.dart';
+import 'routen/titelseite.dart';
 
-void main() => runApp(const NewsdbApp());
+void main() {
+  // Ohne diesen Aufruf wirft `DateFormat('EEEE', 'de')` eine
+  // `LocaleDataException` — `intl` bringt die Daten mit, lädt sie aber nicht
+  // von allein. Der Fehler tritt erst auf, wenn eine Meldung drei Tage alt ist,
+  // also nicht beim Ausprobieren: genau die Sorte Fehler, die in Betrieb geht.
+  initializeDateFormatting('de');
+  runApp(const NewsdbApp());
+}
 
 class NewsdbApp extends StatefulWidget {
   const NewsdbApp({super.key});
@@ -26,9 +43,50 @@ class NewsdbApp extends StatefulWidget {
 }
 
 class _NewsdbAppState extends State<NewsdbApp> {
-  /// Vorgabe ist die Einstellung des Geraets — dieselbe Haltung wie im Web,
-  /// wo `useTheme` mit `prefers-color-scheme` anfaengt.
+  final _anmeldung = Anmeldung();
+  late final NewsdbApi _api = NewsdbApi(anmeldung: _anmeldung);
+
+  /// Vorgabe ist die Einstellung des Geräts — dieselbe Haltung wie im Web, wo
+  /// `useTheme` mit `prefers-color-scheme` anfängt.
   ThemeMode _modus = ThemeMode.system;
+
+  /// Solange die gespeicherte Sitzung geprüft wird, ist weder „angemeldet" noch
+  /// „nicht angemeldet" wahr. Ohne diesen dritten Zustand blitzt bei jedem
+  /// Start das Anmeldeformular auf, obwohl das Konto längst besteht.
+  bool _laedt = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _anmeldung.addListener(_geaendert);
+    _anmeldung.wiederherstellen().whenComplete(() {
+      if (mounted) setState(() => _laedt = false);
+    });
+  }
+
+  void _geaendert() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _anmeldung.removeListener(_geaendert);
+    _api.dispose();
+    _anmeldung.dispose();
+    super.dispose();
+  }
+
+  void _umschalten() {
+    final dunkel =
+        MediaQuery.platformBrightnessOf(context) == Brightness.dark;
+    setState(() {
+      _modus = switch (_modus) {
+        ThemeMode.system => dunkel ? ThemeMode.light : ThemeMode.dark,
+        ThemeMode.light => ThemeMode.dark,
+        ThemeMode.dark => ThemeMode.light,
+      };
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,303 +96,126 @@ class _NewsdbAppState extends State<NewsdbApp> {
       theme: tagesausgabe,
       darkTheme: nachtausgabe,
       themeMode: _modus,
-      home: Musterseite(
-        umschalten: () => setState(() {
-          final dunkel =
-              MediaQuery.platformBrightnessOf(context) == Brightness.dark;
-          _modus = switch (_modus) {
-            ThemeMode.system => dunkel ? ThemeMode.light : ThemeMode.dark,
-            ThemeMode.light => ThemeMode.dark,
-            ThemeMode.dark => ThemeMode.light,
-          };
-        }),
-      ),
+      home: _laedt
+          ? const _Vorhang()
+          : _anmeldung.angemeldet
+              ? Zeitung(
+                  api: _api,
+                  anmeldung: _anmeldung,
+                  themaUmschalten: _umschalten,
+                )
+              : Anmeldeseite(anmeldung: _anmeldung),
     );
   }
 }
 
-/// Beispielverteilungen. Bewusst keine erfundenen Schlagzeilen mit echten
-/// Namen: die Musterseite prueft Groessen und Farben, nicht Inhalte.
-const _breit = {
-  'left': 4,
-  'center-left': 3,
-  'center': 6,
-  'center-right': 2,
-  'right': 1,
-};
-const _schief = {'left': 7, 'center-left': 4, 'center': 2};
-
-class Musterseite extends StatelessWidget {
-  const Musterseite({required this.umschalten, super.key});
-
-  final VoidCallback umschalten;
+/// Der Moment zwischen Start und Entscheidung. Ein Satz, kein leerer
+/// Bildschirm — schwarz ist nicht „lädt", schwarz ist „kaputt".
+class _Vorhang extends StatelessWidget {
+  const _Vorhang();
 
   @override
   Widget build(BuildContext context) {
     final blatt = Blatt.of(context);
     return Scaffold(
-      body: Papier(
-        child: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: Mass.rand,
-              vertical: Mass.kachel,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('newsdb', style: Stil.schlagzeile(26)),
+            const SizedBox(height: Mass.knapp),
+            Text(
+              'einen Moment …',
+              style: Stil.meta.copyWith(color: blatt.tinteGedaempft),
             ),
-            children: [
-              _Kopf(umschalten: umschalten),
-              const SizedBox(height: Mass.kachel),
-
-              const _Abschnitt('Die vier Kachelraenge'),
-              for (final rang in Kachelrang.values) ...[
-                _Kachelprobe(rang: rang),
-                const SizedBox(height: Mass.kachel),
-              ],
-
-              const _Abschnitt('Der Lagerspiegel, ausfuehrlich'),
-              const Lagerspiegel(
-                verteilung: _breit,
-                hoehe: 26,
-                modus: Spiegelmodus.ausfuehrlich,
-                zahlen: true,
-              ),
-              const SizedBox(height: Mass.knapp),
-              const Lagerlegende(),
-              const SizedBox(height: Mass.block),
-              Text(
-                'Kein Bericht von: rechts',
-                style: Stil.meta.copyWith(color: blatt.warnung),
-              ),
-              const SizedBox(height: Mass.knapp),
-              const Lagerspiegel(
-                verteilung: _schief,
-                hoehe: 26,
-                modus: Spiegelmodus.ausfuehrlich,
-                zahlen: true,
-              ),
-              const SizedBox(height: Mass.kachel),
-
-              const _Abschnitt('Lesetext'),
-              Text(
-                'Newsreader fuer die Schlagzeile, Source Serif 4 fuer den '
-                'Lesetext, Archivo fuer die Metazeile, JetBrains Mono fuer '
-                'Zahlen und Kennungen. Die Ziffern im Fliesstext sind '
-                'Mediaevalziffern: 1975, 2026, 138 Haeuser — sie stehen in der '
-                'Zeile und stechen nicht heraus.',
-                style: Stil.lesetext.copyWith(color: blatt.tinte),
-              ),
-              const SizedBox(height: Mass.block),
-              Text(
-                'article/9f3c1a  ·  47 Woerter  ·  0.89',
-                style: Stil.technisch.copyWith(color: blatt.tinteGedaempft),
-              ),
-              const SizedBox(height: Mass.kachel),
-
-              const _Abschnitt('Die Tokens'),
-              const _Farbleiste(),
-              const SizedBox(height: Mass.kachel * 2),
-            ],
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _Kopf extends StatelessWidget {
-  const _Kopf({required this.umschalten});
+/// Die Zeitung: Kopf, Titelseite, und der Weg zu Story und Artikel.
+class Zeitung extends StatelessWidget {
+  const Zeitung({
+    required this.api,
+    required this.anmeldung,
+    required this.themaUmschalten,
+    super.key,
+  });
 
-  final VoidCallback umschalten;
+  final NewsdbApi api;
+  final Anmeldung anmeldung;
+  final VoidCallback themaUmschalten;
+
+  void _story(BuildContext context, String id) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Storyansicht(
+          api: api,
+          storyId: id,
+          artikelOeffnen: (artikelId) => _artikel(context, artikelId),
+        ),
+      ),
+    );
+  }
+
+  void _artikel(BuildContext context, String id) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Artikelansicht(api: api, artikelId: id),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final blatt = Blatt.of(context);
     final dunkel = Theme.of(context).brightness == Brightness.dark;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('newsdb', style: Stil.schlagzeile(30)),
-            IconButton(
-              onPressed: umschalten,
-              icon: Icon(dunkel ? Icons.light_mode : Icons.dark_mode),
-              color: blatt.tinteGedaempft,
-              tooltip: dunkel ? 'Tagesausgabe' : 'Nachtausgabe',
-            ),
-          ],
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('newsdb', style: Stil.schlagzeile(22)),
+        // Die Kopfzeile trägt die Haarlinie des Blattlayouts, nicht einen
+        // Schatten: ein Schatten wäre Material, eine Linie ist Zeitung.
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(color: blatt.linieStark, height: 1, thickness: 1),
         ),
-        Text(
-          'MUSTERSEITE · DESIGN AUS DER WEB-OBERFLAECHE',
-          style: Stil.kicker.copyWith(color: blatt.akzent),
-        ),
-        const SizedBox(height: Mass.normal),
-        Divider(color: blatt.linieStark, height: 1),
-      ],
-    );
-  }
-}
-
-class _Abschnitt extends StatelessWidget {
-  const _Abschnitt(this.titel);
-
-  final String titel;
-
-  @override
-  Widget build(BuildContext context) {
-    final blatt = Blatt.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: Mass.normal),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Divider(color: blatt.linie, height: 1),
-          const SizedBox(height: Mass.knapp),
-          Text(titel.toUpperCase(),
-              style: Stil.kicker.copyWith(color: blatt.tinteGedaempft)),
-          const SizedBox(height: Mass.knapp),
-        ],
-      ),
-    );
-  }
-}
-
-/// Eine Kachel in einem der vier Raenge — Bildplatzhalter, Abzeichen,
-/// Schlagzeile, Lagerbalken, Zeit. Genau die Bausteine, die `StoryKachel` im
-/// Web zeigt, und ausdruecklich nicht mehr: die fuenf Stufen und die Belege
-/// gehoeren auf die Seite dahinter.
-class _Kachelprobe extends StatelessWidget {
-  const _Kachelprobe({required this.rang});
-
-  final Kachelrang rang;
-
-  @override
-  Widget build(BuildContext context) {
-    final blatt = Blatt.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        AspectRatio(
-          aspectRatio: rang.bildformat,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: blatt.papierVertieft,
-              border: Border.all(color: blatt.linie),
-              borderRadius: BorderRadius.circular(Mass.rundung),
-            ),
-            child: Center(
-              child: Text(
-                '${rang.name} · ${rang.bildformat.toStringAsFixed(2)}',
-                style: Stil.meta.copyWith(color: blatt.tinteBlass),
-              ),
-            ),
+        actions: [
+          IconButton(
+            onPressed: themaUmschalten,
+            icon: Icon(dunkel ? Icons.light_mode : Icons.dark_mode),
+            color: blatt.tinteGedaempft,
+            tooltip: dunkel ? 'Tagesausgabe' : 'Nachtausgabe',
           ),
-        ),
-        const SizedBox(height: Mass.normal),
-        const _Abzeichen(text: '12 Haeuser'),
-        const SizedBox(height: Mass.eng),
-        Text(
-          'Der Bundestag streitet ueber den Haushalt, und jedes Haus '
-          'formuliert es anders',
-          style: rang.stil.copyWith(color: blatt.tinte),
-        ),
-        const SizedBox(height: Mass.normal),
-        Lagerspiegel(verteilung: _breit, hoehe: rang.balken),
-        if (rang == Kachelrang.aufmacher) ...[
-          const SizedBox(height: Mass.knapp),
-          const Lagerlegende(),
-        ],
-        const SizedBox(height: Mass.knapp),
-        Text('vor 20 Minuten',
-            style: Stil.meta.copyWith(color: blatt.tinteGedaempft)),
-      ],
-    );
-  }
-}
-
-/// Das Abzeichen mit der Haeuserzahl — im Web `Badge variant="accent"`.
-class _Abzeichen extends StatelessWidget {
-  const _Abzeichen({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final blatt = Blatt.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: blatt.akzentSanft,
-        borderRadius: BorderRadius.circular(Mass.rundung - 2),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.layers_outlined, size: 12, color: blatt.akzent),
-          const SizedBox(width: 4),
-          Text(text,
-              style: Stil.zahl.copyWith(color: blatt.akzent, fontSize: 11)),
-        ],
-      ),
-    );
-  }
-}
-
-/// Alle Flaechen- und Lagerfarben als Streifen — die schnellste Gegenprobe
-/// gegen den Browser.
-class _Farbleiste extends StatelessWidget {
-  const _Farbleiste();
-
-  @override
-  Widget build(BuildContext context) {
-    final blatt = Blatt.of(context);
-    final proben = <(String, Color)>[
-      ('papier', blatt.papier),
-      ('gehoben', blatt.papierGehoben),
-      ('vertieft', blatt.papierVertieft),
-      ('tinte', blatt.tinte),
-      ('gedaempft', blatt.tinteGedaempft),
-      ('blass', blatt.tinteBlass),
-      ('linie', blatt.linie),
-      ('akzent', blatt.akzent),
-      ('sanft', blatt.akzentSanft),
-      ('verweis', blatt.verweis),
-      ('gut', blatt.gut),
-      ('warnung', blatt.warnung),
-      ('links', blatt.stufeLinks),
-      ('m-links', blatt.stufeMitteLinks),
-      ('mitte', blatt.stufeMitte),
-      ('m-rechts', blatt.stufeMitteRechts),
-      ('rechts', blatt.stufeRechts),
-    ];
-    return Wrap(
-      spacing: Mass.knapp,
-      runSpacing: Mass.knapp,
-      children: [
-        for (final (name, farbe) in proben)
-          Column(
-            children: [
-              Container(
-                width: 52,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: farbe,
-                  border: Border.all(color: blatt.linie),
-                  borderRadius: BorderRadius.circular(Mass.rundung - 2),
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert, color: blatt.tinteGedaempft),
+            color: blatt.papierGehoben,
+            onSelected: (wahl) {
+              if (wahl == 'abmelden') anmeldung.abmelden();
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                enabled: false,
+                child: Text(
+                  anmeldung.konto?.email ?? 'angemeldet',
+                  style: Stil.meta.copyWith(color: blatt.tinteGedaempft),
                 ),
               ),
-              const SizedBox(height: 3),
-              Text(name,
-                  style: Stil.meta
-                      .copyWith(fontSize: 10, color: blatt.tinteGedaempft)),
-              Text(
-                '#${(farbe.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}',
-                style: Stil.technisch
-                    .copyWith(fontSize: 9, color: blatt.tinteBlass),
+              PopupMenuItem(
+                value: 'abmelden',
+                child: Text('Abmelden', style: Stil.zahl),
               ),
             ],
           ),
-      ],
+        ],
+      ),
+      body: Titelseiteansicht(
+        api: api,
+        anmeldung: anmeldung,
+        storyOeffnen: (id) => _story(context, id),
+        artikelOeffnen: (id) => _artikel(context, id),
+      ),
     );
   }
 }

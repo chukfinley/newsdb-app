@@ -10,11 +10,13 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # Identitaet. Die Grenze aus A148: Konten, Rollen und Abos liegen in Convex,
-  # Artikel auf dem VPS. Das Paket liefert den Client samt Token-Erneuerung;
-  # die Passwort-Anmeldung selbst ist eine Convex-Action (`auth:signIn`), weil
-  # `@convex-dev/auth` sie so anbietet.
-  convex_flutter: ^3.0.1
+  # Identitaet laeuft ueber Convex (A148) — aber **ohne** das Paket
+  # `convex_flutter`. Dessen Rust-Kern baut ueber cargokit, und deren
+  # Gradle-Plugin ruft `Project.exec()`, das Gradle 9 entfernt hat: der Build
+  # bricht ab, bevor eine Zeile eigener Code uebersetzt ist (gemessen am
+  # 17.8.2026 mit Flutter 3.47 / Gradle 9.3.1). Stattdessen die
+  # HTTP-Schnittstelle von Convex in `lib/auth/convex.dart` — dieselbe Funktion,
+  # kein natives Stueck im Buendel, und Web laeuft mit.
 
   # Alles Redaktionelle kommt ueber `news.chuk.dev/api`. `http` und nicht `dio`:
   # gebraucht werden GET mit einem Kopf und JSON zurueck, dafuer ist die

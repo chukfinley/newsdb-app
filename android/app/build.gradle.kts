@@ -22,6 +22,30 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    packaging {
+        jniLibs {
+            // **Die alte Verpackung, mit Absicht.**
+            //
+            // Seit Android 6 legt Gradle die `.so`-Dateien **unkomprimiert**
+            // ins APK: der Installer muss sie dann nicht entpacken, und die App
+            // startet minimal schneller. Der Preis steht im Downloadumfang, und
+            // der ist bei Flutter erheblich — `libflutter.so` allein misst
+            // unkomprimiert 11,2 MB (gemessen am 17.8.2026).
+            //
+            // `useLegacyPackaging = true` schaltet auf komprimiert zurueck. Das
+            // APK wird deutlich kleiner; dafuer belegt die App nach der
+            // Installation etwas mehr Platz, weil die Bibliotheken dann
+            // ausgepackt auf dem Geraet liegen.
+            //
+            // Fuer eine App, die ueber GitHub geladen wird, ist das der richtige
+            // Handel: der Download ist das, was jemand merkt. Fuer den Play
+            // Store waere es der falsche — dort liefert ein App Bundle ohnehin
+            // nur die passende Architektur aus, und Google empfiehlt die neue
+            // Verpackung.
+            useLegacyPackaging = true
+        }
+    }
+
     defaultConfig {
         applicationId = "dev.chuk.newsdb_app"
         minSdk = flutter.minSdkVersion
@@ -34,21 +58,32 @@ android {
 
     buildTypes {
         release {
-            // **Unsigniert, ausdruecklich.** Ansage vom 17.8.2026: „ein unsigned
-            // release ok kein debug".
+            // **Release-Bau, aber mit dem Debug-Schluessel signiert.** Ansage
+            // vom 17.8.2026, und der Zwischenschritt ist richtig so.
             //
-            // Flutters Vorgabe waere `signingConfigs.getByName("debug")` — ein
-            // Release-Buendel, das mit dem Debug-Schluessel unterschrieben ist.
-            // Das ist bequem und irrefuehrend: es sieht aus wie ein fertiges
-            // APK, traegt aber einen Schluessel, den jede Flutter-Installation
-            // auf der Welt hat. Ein spaeterer Wechsel auf den echten Schluessel
-            // zwingt danach jeden Nutzer zur Deinstallation, weil Android eine
-            // App mit anderer Signatur nicht als dieselbe erkennt.
+            // Der Weg dahin ist es wert, festgehalten zu werden: zuerst stand
+            // hier `signingConfig = null`, also ein wirklich unsigniertes APK.
+            // Das ist der ehrlichste Zustand — und **unbrauchbar**, weil
+            // Android ein unsigniertes Paket gar nicht erst installiert, meist
+            // ohne verwertbare Meldung. Ein Buendel, das niemand aufspielen
+            // kann, ist kein Buendel.
             //
-            // `null` heisst: Gradle legt `app-release-unsigned.apk` ab. Das
-            // laesst sich **nicht** ohne Weiteres installieren — genau das ist
-            // der ehrliche Zustand, solange es keinen eigenen Schluessel gibt.
-            signingConfig = null
+            // Der Debug-Schluessel liegt in `~/.android/debug.keystore` und ist
+            // auf jedem Rechner der Welt derselbe. Er taugt deshalb NICHT fuer
+            // eine Veroeffentlichung: jeder koennte ein Update signieren, das
+            // Android als dieselbe App akzeptiert.
+            //
+            // Der echte Schluessel liegt bereit (`~/newsdb-keys/`, 4096 Bit,
+            // 30 Jahre) und ist absichtlich noch nicht in Gebrauch: ab dem
+            // Moment, in dem eine App damit verbreitet ist, ist er nicht mehr
+            // austauschbar — geht er verloren, kann niemand mehr ein Update
+            // ausliefern. Solange nichts verbreitet ist, kostet ein Wechsel
+            // nichts.
+            //
+            // Was der Wechsel spaeter bedeutet: wer diese Fassung installiert
+            // hat, muss sie einmal deinstallieren. Android erkennt eine App mit
+            // anderer Signatur nicht als dieselbe.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 }

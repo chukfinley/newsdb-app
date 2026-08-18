@@ -171,6 +171,15 @@ class _Muster extends StatelessWidget {
               ),
               const SizedBox(height: Mass.knapp),
               Lagerkuerzel(verteilung: _breit.lagerVerteilung),
+              const SizedBox(height: Mass.block),
+              Text('L/M/R IM BALKEN (AUFMACHER, 18 PX)',
+                  style: Stil.kicker.copyWith(color: blatt.tinteGedaempft)),
+              const SizedBox(height: Mass.knapp),
+              Lagerspiegel(
+                verteilung: _breit.lagerVerteilung,
+                hoehe: 18,
+                buchstaben: true,
+              ),
               const SizedBox(height: Mass.kachel),
 
               Text(

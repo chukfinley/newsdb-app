@@ -124,7 +124,14 @@ class Aufmacher extends StatelessWidget {
           const SizedBox(height: Mass.abzeichen),
           Text(kachel.titel, style: rang.stil.copyWith(color: blatt.tinte)),
           const SizedBox(height: Mass.block),
-          Lagerspiegel(verteilung: kachel.lagerVerteilung, hoehe: rang.balken),
+          // Der Aufmacher trägt L/M/R **im** Balken (18 px hoch), wie das Web
+          // seit dem 18.8.2026 — die Legende darunter entfällt dafür. Die
+          // Zahlen stehen weiter im Lagerkürzel eine Zeile tiefer.
+          Lagerspiegel(
+            verteilung: kachel.lagerVerteilung,
+            hoehe: 18,
+            buchstaben: true,
+          ),
           const SizedBox(height: Mass.knapp),
           Lagerkuerzel(verteilung: kachel.lagerVerteilung),
           const SizedBox(height: Mass.knapp),

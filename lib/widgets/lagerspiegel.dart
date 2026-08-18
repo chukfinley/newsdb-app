@@ -69,6 +69,7 @@ class Lagerspiegel extends StatelessWidget {
     this.hoehe = 6,
     this.modus = Spiegelmodus.kompakt,
     this.zahlen = false,
+    this.buchstaben = false,
     super.key,
   });
 
@@ -85,6 +86,13 @@ class Lagerspiegel extends StatelessWidget {
   /// darunter passt keine Ziffer hinein, und eine abgeschnittene Ziffer ist
   /// schlimmer als keine.
   final bool zahlen;
+
+  /// L/M/R direkt ins Farbfeld schreiben, statt in eine Legende darunter
+  /// (Ansage vom 18.8.2026, aus dem Web uebernommen). Der Balken beschriftet
+  /// dann seine Farbe selbst. Braucht Hoehe fuer die Buchstaben — sinnvoll ab
+  /// etwa 18 px. Nur im kompakten Modus (drei Lager); die fuenf Stufen tragen
+  /// keine sinnvollen Einbuchstaben.
+  final bool buchstaben;
 
   @override
   Widget build(BuildContext context) {
@@ -151,21 +159,7 @@ class Lagerspiegel extends StatelessWidget {
                     flex: n,
                     child: ColoredBox(
                       color: farbe,
-                      child: !zahlen
-                          ? null
-                          : Center(
-                              child: Text(
-                                '$n',
-                                style: Stil.zahl.copyWith(
-                                  color: kompakt
-                                      ? blatt.aufLager(name)
-                                      : (name == 'center'
-                                          ? blatt.aufLagerMitte
-                                          : const Color(0xFFFFFFFF)),
-                                  fontSize: hoehe * 0.5,
-                                ),
-                              ),
-                            ),
+                      child: _segmentschrift(blatt, name, n, summe, kompakt),
                     ),
                   ),
             ],
@@ -173,6 +167,38 @@ class Lagerspiegel extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Was im Farbfeld steht: der Buchstabe (L/M/R), die Zahl, oder nichts.
+  ///
+  /// Der Buchstabe erscheint nur, wenn das Segment breit genug ist — ein
+  /// abgeschnittenes "L" auf einem Zwei-Prozent-Streifen ist schlechter als
+  /// keins. Dieselbe Schwelle wie im Web (rund 6 Prozent Anteil).
+  Widget? _segmentschrift(
+      Blatt blatt, String name, int n, int summe, bool kompakt) {
+    final aufFarbe = kompakt
+        ? blatt.aufLager(name)
+        : (name == 'center' ? blatt.aufLagerMitte : const Color(0xFFFFFFFF));
+    if (buchstaben && kompakt && summe > 0 && n / summe > 0.06) {
+      return Center(
+        child: Text(
+          lagerBuchstabe[name] ?? '',
+          style: Stil.kicker.copyWith(
+            color: aufFarbe,
+            fontSize: (hoehe * 0.55).clamp(9.0, 13.0),
+          ),
+        ),
+      );
+    }
+    if (zahlen) {
+      return Center(
+        child: Text(
+          '$n',
+          style: Stil.zahl.copyWith(color: aufFarbe, fontSize: hoehe * 0.5),
+        ),
+      );
+    }
+    return null;
   }
 
   /// Fuer die Vorlesefunktion. Ein Balken ohne Beschriftung ist fuer jemanden,

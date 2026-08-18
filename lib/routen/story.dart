@@ -148,6 +148,16 @@ class _Inhalt extends StatelessWidget {
         const SizedBox(height: Mass.knapp),
         Lagerkuerzel(verteilung: story.lagerVerteilung),
 
+        // Wer besitzt die berichtenden Häuser? Die Zahl, die eine einzelne
+        // Zeitung nie zeigt — und die eine laute Meldung entlarvt, hinter der
+        // nur wenige Konzerne stehen.
+        _Eigentuemer(story: story),
+
+        // Seit wann läuft die Story, wie lange schon? Ein Ereignis, über das
+        // seit drei Tagen berichtet wird, ist eine andere Lage als eins von
+        // heute Morgen.
+        _Zeitspanne(story: story),
+
         if (fehlt.isNotEmpty) ...[
           const SizedBox(height: Mass.block),
           Container(
@@ -293,6 +303,101 @@ class _Bericht extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Die Eigentümerkonzentration — wer hinter den Häusern steht.
+///
+/// Ein Nachbau der Idee aus dem Web (`story-insights.tsx`): 38 Häuser klingen
+/// nach Vielfalt, aber wenn dahinter nur drei Konzerne stehen, ist es eine
+/// Meldung, die nur laut ist. Die App rechnet nichts — die Zahlen kommen aus
+/// `ownership_spread` der API.
+class _Eigentuemer extends StatelessWidget {
+  const _Eigentuemer({required this.story});
+
+  final Story story;
+
+  @override
+  Widget build(BuildContext context) {
+    final eig = story.eigentuemer;
+    final haeuser = story.haeuserGesamt;
+    if (eig == null || haeuser == null || haeuser == 0) {
+      return const SizedBox.shrink();
+    }
+    final blatt = Blatt.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: Mass.block),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            story.konzentriert ? Icons.account_balance : Icons.groups_outlined,
+            size: 16,
+            color: story.konzentriert ? blatt.warnung : blatt.tinteGedaempft,
+          ),
+          const SizedBox(width: Mass.knapp),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: Stil.meta.copyWith(color: blatt.tinteGedaempft),
+                children: [
+                  TextSpan(text: '$haeuser Häuser aus '),
+                  TextSpan(
+                    text: '$eig ${eig == 1 ? "Eigentümer" : "Eigentümern"}',
+                    style: Stil.zahl.copyWith(
+                      color: blatt.tinte,
+                      fontSize: 12,
+                    ),
+                  ),
+                  if (story.konzentriert && story.groessteGruppe != null)
+                    TextSpan(
+                      text: ' — vor allem ${story.groessteGruppe}'
+                          '${story.groessterAnteil != null ? " (${story.groessterAnteil!.round()} %)" : ""}',
+                      style: TextStyle(color: blatt.warnung),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Die Zeitspanne der Berichterstattung.
+///
+/// „Seit gestern, zuletzt vor zwei Stunden" sagt mehr als ein einzelner
+/// Zeitpunkt: es unterscheidet ein laufendes Ereignis von einer Momentmeldung.
+class _Zeitspanne extends StatelessWidget {
+  const _Zeitspanne({required this.story});
+
+  final Story story;
+
+  @override
+  Widget build(BuildContext context) {
+    final von = story.zuerst;
+    final bis = story.zuletzt;
+    if (von == null && bis == null) return const SizedBox.shrink();
+    final blatt = Blatt.of(context);
+    final teile = <String>[];
+    if (von != null) teile.add('seit ${zeitText(von)}');
+    if (bis != null) teile.add('zuletzt ${zeitText(bis)}');
+    return Padding(
+      padding: const EdgeInsets.only(top: Mass.eng),
+      child: Row(
+        children: [
+          Icon(Icons.schedule, size: 16, color: blatt.tinteGedaempft),
+          const SizedBox(width: Mass.knapp),
+          Expanded(
+            child: Text(
+              teile.join(' · '),
+              style: Stil.meta.copyWith(color: blatt.tinteGedaempft),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -180,6 +180,11 @@ class Story {
     this.zusammenfassung,
     this.blindspot = const [],
     this.artikel = const [],
+    this.eigentuemer,
+    this.haeuserGesamt,
+    this.konzentriert = false,
+    this.groessteGruppe,
+    this.groessterAnteil,
   });
 
   factory Story.vonJson(Map<String, dynamic> json) => Story(
@@ -207,6 +212,22 @@ class Story {
                 .map((a) => Artikel.vonJson(a.cast<String, dynamic>()))
                 .toList() ??
             const [],
+        // A175/Ground-News-Idee: nicht nur wie viele Häuser berichten, sondern
+        // wie viele **verschiedene Eigentümer** dahinterstehen. 38 Häuser aus
+        // 32 Eigentümern ist Vielfalt; 38 Häuser aus 3 Konzernen ist eine
+        // Meldung, die nur laut klingt. Die API rechnet das schon
+        // (`ownership_spread`), die App zeigt es bisher nicht.
+        eigentuemer:
+            ((json['ownership_spread'] as Map?)?['distinct_owners'] as num?)
+                ?.toInt(),
+        haeuserGesamt:
+            ((json['ownership_spread'] as Map?)?['outlets'] as num?)?.toInt(),
+        konzentriert:
+            (json['ownership_spread'] as Map?)?['concentrated'] == true,
+        groessteGruppe: _groessteGruppe(json['ownership_spread']),
+        groessterAnteil:
+            ((json['ownership_spread'] as Map?)?['largest_share'] as num?)
+                ?.toDouble(),
       );
 
   final String id;
@@ -216,6 +237,24 @@ class Story {
   final int anzahlArtikel;
   final DateTime? zuerst;
   final DateTime? zuletzt;
+
+  /// Wie viele **verschiedene** Eigentümer hinter den berichtenden Häusern
+  /// stehen. `null`, solange die API es nicht liefert.
+  final int? eigentuemer;
+
+  /// Die Zahl der Häuser aus Sicht der Eigentümer-Auswertung — kann von
+  /// `haeuser.length` abweichen, wenn ein Haus keinem Eigentümer zugeordnet ist.
+  final int? haeuserGesamt;
+
+  /// Liegt die Berichterstattung in wenigen Händen? Die API entscheidet das
+  /// (HHI-Schwelle), die App zeichnet nur die Warnung.
+  final bool konzentriert;
+
+  /// Der Name der größten Eigentümergruppe — für den Satz „vor allem …".
+  final String? groessteGruppe;
+
+  /// Ihr Anteil in Prozent.
+  final double? groessterAnteil;
   final String? anriss;
   final bool anrissGekuerzt;
   final String? anrissQuelle;
@@ -353,6 +392,26 @@ class Artikel {
 /// Die Antwort enthält die Adresse ohnehin schon: `images` trägt je Eintrag
 /// `url` und `role`. Also von dort, ohne Umweg und ohne Token — genauso wie
 /// das Web es macht.
+/// Der Klarname der größten Eigentümergruppe aus `ownership_spread`.
+///
+/// Die API liefert `largest_group` als Kennung (`ippen`), der lesbare Name
+/// steht in der `groups`-Liste. Wir suchen ihn dort und kürzen den Klammerzusatz
+/// weg: „Ippen-Gruppe (Dirk Ippen)" wird zu „Ippen-Gruppe".
+String? _groessteGruppe(Object? ownership) {
+  if (ownership is! Map) return null;
+  final kennung = ownership['largest_group'] as String?;
+  if (kennung == null) return null;
+  final gruppen = (ownership['groups'] as List?)?.whereType<Map>();
+  final treffer = gruppen?.firstWhere(
+    (g) => g['group'] == kennung,
+    orElse: () => const {},
+  );
+  final name = treffer?['name'] as String?;
+  if (name == null || name.isEmpty) return null;
+  final klammer = name.indexOf(' (');
+  return klammer > 0 ? name.substring(0, klammer) : name;
+}
+
 String? _aufmacherbild(Map<String, dynamic> json) {
   final bilder = (json['images'] as List?)?.whereType<Map>().toList();
   if (bilder == null || bilder.isEmpty) {

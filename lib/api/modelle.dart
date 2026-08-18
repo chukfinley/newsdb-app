@@ -133,6 +133,50 @@ class Titelseite {
   final String? stufe;
 }
 
+/// Ein Suchtreffer aus `GET /api/articles?q=…` — ein Listeneintrag, keine
+/// volle Ausgabe. Genug, um die Trefferliste zu zeichnen; der Volltext kommt
+/// erst beim Öffnen (`Artikel`).
+class Suchtreffer {
+  const Suchtreffer({
+    required this.id,
+    required this.titel,
+    required this.hausId,
+    this.hausDomain,
+    this.anriss,
+    this.ressort,
+    this.veroeffentlicht,
+    this.bild,
+    this.woerter = 0,
+    this.schranke = Schranke.unbekannt,
+  });
+
+  factory Suchtreffer.vonJson(Map<String, dynamic> json) => Suchtreffer(
+        id: json['id'] as String,
+        titel: json['title'] as String? ?? '',
+        hausId: json['source_id'] as String? ?? '',
+        hausDomain: json['domain'] as String?,
+        // `summary` ist bei der Liste schon ein Anriss, kein Volltext — und
+        // fällt für Gäste weg (A150). Beides ist hier in Ordnung.
+        anriss: json['summary'] as String?,
+        ressort: json['section'] as String?,
+        veroeffentlicht: _zeit(json['published_at']),
+        bild: json['lead_image'] as String?,
+        woerter: (json['word_count'] as num?)?.toInt() ?? 0,
+        schranke: Schranke.vonJson(json['paywall']),
+      );
+
+  final String id;
+  final String titel;
+  final String hausId;
+  final String? hausDomain;
+  final String? anriss;
+  final String? ressort;
+  final DateTime? veroeffentlicht;
+  final String? bild;
+  final int woerter;
+  final Schranke schranke;
+}
+
 /// Ein Haus (`GET /api/sources`). Gebraucht wird fast nur der Name — die
 /// Kacheln zeigen Häusernamen, die API liefert Kennungen.
 class Haus {

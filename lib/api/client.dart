@@ -119,6 +119,32 @@ class NewsdbApi {
   Future<Artikel> artikel(String id) async =>
       Artikel.vonJson(await _holen('/api/articles/$id'));
 
+  /// Volltextsuche über `/api/articles?q=…`. Liefert Listeneinträge (Teaser),
+  /// nicht volle Artikel — der Volltext kommt erst beim Öffnen.
+  ///
+  /// `total` sagt, wie viele Treffer es insgesamt gibt; `items` sind die ersten
+  /// `anzahl`. Die App zeigt die Zahl, damit „3 von 29.074" ehrlich ist und
+  /// nicht so tut, als wären es nur drei.
+  Future<({int gesamt, List<Suchtreffer> treffer})> suche(
+    String frage, {
+    int anzahl = 30,
+    int ab = 0,
+  }) async {
+    final antwort = await _holen('/api/articles', {
+      'q': frage,
+      'limit': '$anzahl',
+      'offset': '$ab',
+    });
+    return (
+      gesamt: (antwort['total'] as num?)?.toInt() ?? 0,
+      treffer: (antwort['items'] as List?)
+              ?.whereType<Map>()
+              .map((t) => Suchtreffer.vonJson(t.cast<String, dynamic>()))
+              .toList() ??
+          const [],
+    );
+  }
+
   /// Alle Häuser, einmal geholt und behalten.
   ///
   /// Die Kacheln zeigen Häusernamen, die API liefert Kennungen wie `spiegel`.

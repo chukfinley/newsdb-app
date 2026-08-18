@@ -24,6 +24,7 @@ import 'design/typografie.dart';
 import 'routen/anmelden.dart';
 import 'routen/artikel.dart';
 import 'routen/story.dart';
+import 'routen/suche.dart';
 import 'routen/titelseite.dart';
 
 void main() {
@@ -168,6 +169,17 @@ class Zeitung extends StatelessWidget {
     );
   }
 
+  void _suche(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Suchseite(
+          api: api,
+          artikelOeffnen: (id) => _artikel(context, id),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final blatt = Blatt.of(context);
@@ -182,6 +194,12 @@ class Zeitung extends StatelessWidget {
           child: Divider(color: blatt.linieStark, height: 1, thickness: 1),
         ),
         actions: [
+          IconButton(
+            onPressed: () => _suche(context),
+            icon: const Icon(Icons.search),
+            color: blatt.tinteGedaempft,
+            tooltip: 'Suchen',
+          ),
           IconButton(
             onPressed: themaUmschalten,
             icon: Icon(dunkel ? Icons.light_mode : Icons.dark_mode),

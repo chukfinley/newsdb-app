@@ -14,6 +14,7 @@ library;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:newsdb_app/api/modelle.dart';
+import 'package:newsdb_app/routen/artikel.dart';
 import 'package:newsdb_app/design/thema.dart';
 import 'package:newsdb_app/widgets/lagerspiegel.dart';
 
@@ -310,6 +311,29 @@ void main() {
       });
       expect(a.bloecke, isEmpty);
       expect(a.lesbar, 'Nur Fließtext.');
+    });
+  });
+
+  group('absaetze() — die Lesewand zerlegen', () {
+    test('echte Doppelumbrüche werden respektiert', () {
+      expect(absaetze('Erster Absatz.\n\nZweiter Absatz.'),
+          ['Erster Absatz.', 'Zweiter Absatz.']);
+    });
+
+    test('kurzer Text bleibt ein Stück', () {
+      expect(absaetze('Nur ein kurzer Satz.'), ['Nur ein kurzer Satz.']);
+    });
+
+    test('eine lange Wand ohne Umbruch wird an Satzgrenzen gebündelt', () {
+      // Gemessen am 19.8.2026: Häuser liefern bis 20.000 Zeichen in einem
+      // Block ohne Umbruch. Acht Sätze über 1200 Zeichen → zwei Häppchen.
+      final satz = 'Dies ist ein hinreichend langer Beispielsatz mit Inhalt. ';
+      final wand = satz * 30; // weit über 1200 Zeichen, keine Doppelumbrüche
+      final teile = absaetze(wand);
+      expect(teile.length, greaterThan(1),
+          reason: 'die Wand muss zerlegt werden');
+      // Kein Häppchen ist die ganze Wand.
+      expect(teile.every((t) => t.length < wand.length), isTrue);
     });
   });
 }

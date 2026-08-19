@@ -196,12 +196,10 @@ class _Inhalt extends StatelessWidget {
             style: Stil.meta.copyWith(color: blatt.tinteGedaempft),
           )
         else
-          // Absätze von Hand: die API liefert den Text mit Zeilenumbrüchen, und
-          // ein einziger `Text` mit 800 Wörtern ist eine Wand.
-          for (final absatz in text
-              .split(RegExp(r'\n{2,}'))
-              .map((a) => a.trim())
-              .where((a) => a.isNotEmpty))
+          // Fließtext-Fallback (keine Bausteine): dieselbe Absatz-Zerlegung wie
+          // bei einem paragraph-Block, damit auch eine umbruchlose Wand lesbar
+          // wird.
+          for (final absatz in absaetze(text))
             Padding(
               padding: const EdgeInsets.only(bottom: Mass.block),
               child: Text(
@@ -395,13 +393,51 @@ class _BlockWidget extends StatelessWidget {
         // Einbettungen (Tweets, Videos) zeigt die App noch nicht als solche;
         // trägt der Block einen Text, kommt er als Absatz, sonst gar nicht.
         if (block.text.trim().isEmpty) return const SizedBox.shrink();
-        return Padding(
-          padding: const EdgeInsets.only(bottom: Mass.block),
-          child: Text(
-            block.text,
-            style: Stil.lesetext.copyWith(color: blatt.tinte),
-          ),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Gemessen am 19.8.2026: manche Häuser liefern den ganzen Artikel
+            // als EINEN paragraph-Block ohne jeden Umbruch — bis 20.000
+            // Zeichen. Das wäre eine Lesewand. `absaetze()` zerlegt sie an
+            // Satzgrenzen.
+            for (final teil in absaetze(block.text))
+              Padding(
+                padding: const EdgeInsets.only(bottom: Mass.block),
+                child: Text(
+                  teil,
+                  style: Stil.lesetext.copyWith(color: blatt.tinte),
+                ),
+              ),
+          ],
         );
     }
   }
+}
+
+/// Text in lesbare Absätze zerlegen.
+///
+/// Erst an echten Doppelumbrüchen. Fehlen die und der Text ist lang (eine
+/// Wand), wird an Satzgrenzen in Häppchen von etwa vier Sätzen geteilt — genug,
+/// dass das Auge Halt findet, ohne den Sinn zu zerschneiden. Kurze Texte
+/// bleiben, wie sie sind.
+List<String> absaetze(String text) {
+  final klar = text
+      .split(RegExp(r'\n{2,}'))
+      .map((a) => a.trim())
+      .where((a) => a.isNotEmpty)
+      .toList();
+  // Schon gegliedert, oder kurz genug: nichts zu tun.
+  if (klar.length > 1 || text.length < 1200) {
+    return klar.isEmpty ? [text.trim()] : klar;
+  }
+  // Eine Wand: an Satzenden zerlegen und je vier Sätze bündeln.
+  final saetze = klar.first
+      .split(RegExp(r'(?<=[.!?])\s+'))
+      .where((s) => s.trim().isNotEmpty)
+      .toList();
+  final raus = <String>[];
+  for (var i = 0; i < saetze.length; i += 4) {
+    raus.add(saetze.sublist(i, (i + 4).clamp(0, saetze.length)).join(' '));
+  }
+  return raus.isEmpty ? [text.trim()] : raus;
 }

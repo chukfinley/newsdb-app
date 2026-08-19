@@ -141,7 +141,11 @@ class _Inhalt extends StatelessWidget {
           ],
         ),
 
-        if (artikel.bild != null) ...[
+        // Das Aufmacherbild nur zeigen, wenn die Bausteine die Bilder NICHT
+        // ohnehin tragen — sonst stünde dasselbe Bild zweimal da, einmal oben
+        // und einmal als erster Bild-Block.
+        if (artikel.bild != null &&
+            !_zeigbareBloecke(artikel).any((b) => b.art == Blockart.bild)) ...[
           const SizedBox(height: Mass.block),
           Bild(adresse: artikel.bild, format: 3 / 2, beschreibung: artikel.titel),
         ],
@@ -179,7 +183,13 @@ class _Inhalt extends StatelessWidget {
         Divider(color: blatt.linie, height: 1),
         const SizedBox(height: Mass.block),
 
-        if (text == null || text.isEmpty)
+        // Wenn die API Bausteine liefert (`blocks`), werden sie gezeigt —
+        // Bilder an ihrer Stelle, Zwischenüberschriften, Listen. Sonst der
+        // Fließtext als Absätze, sonst der Hinweis, dass es keinen Text gibt.
+        if (_zeigbareBloecke(artikel).isNotEmpty)
+          for (final block in _zeigbareBloecke(artikel))
+            _BlockWidget(block: block, artikel: artikel)
+        else if (text == null || text.isEmpty)
           Text(
             'Von diesem Artikel haben wir keinen Text — nur die Überschrift '
             'und woher sie kommt.',
@@ -187,8 +197,7 @@ class _Inhalt extends StatelessWidget {
           )
         else
           // Absätze von Hand: die API liefert den Text mit Zeilenumbrüchen, und
-          // ein einziger `Text` mit 800 Wörtern ist eine Wand. `blocks` wäre
-          // der bessere Weg und kommt, wenn die Ansicht Bilder im Text zeigt.
+          // ein einziger `Text` mit 800 Wörtern ist eine Wand.
           for (final absatz in text
               .split(RegExp(r'\n{2,}'))
               .map((a) => a.trim())
@@ -258,5 +267,141 @@ class _Hinweis extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Die Bausteine, die zu zeigen sind — der redundante Anfang gefiltert.
+///
+/// Die ersten Blöcke sind oft Wiederholung: ein Breadcrumb als Liste
+/// („Startseite / Wirtschaft"), die Überschrift als heading Ebene 1 (die steht
+/// schon oben), eine Datumszeile. Die zeigt die Ansicht nicht doppelt.
+List<Block> _zeigbareBloecke(Artikel artikel) {
+  final roh = artikel.bloecke;
+  if (roh.isEmpty) return const [];
+  final raus = <Block>[];
+  for (final b in roh) {
+    // Breadcrumb-Liste am Anfang: eine Liste, bevor irgendein Absatz kam.
+    if (b.art == Blockart.liste && raus.isEmpty) continue;
+    // Die Titel-Überschrift (Ebene 1): steht schon als Schlagzeile oben.
+    if (b.art == Blockart.ueberschrift && (b.stufe ?? 1) <= 1) continue;
+    // Leere Blöcke (Bild ohne auflösbare Kennung, leerer Absatz).
+    if (b.art == Blockart.bild) {
+      if (b.bildId == null || artikel.bilder[b.bildId] == null) continue;
+    } else if (b.text.trim().isEmpty && b.punkte.isEmpty) {
+      continue;
+    }
+    raus.add(b);
+  }
+  return raus;
+}
+
+/// Ein einzelner Baustein.
+class _BlockWidget extends StatelessWidget {
+  const _BlockWidget({required this.block, required this.artikel});
+
+  final Block block;
+  final Artikel artikel;
+
+  @override
+  Widget build(BuildContext context) {
+    final blatt = Blatt.of(context);
+    switch (block.art) {
+      case Blockart.ueberschrift:
+        return Padding(
+          padding: const EdgeInsets.only(top: Mass.knapp, bottom: Mass.normal),
+          child: Text(
+            block.text,
+            style: Stil.schlagzeile(block.stufe == 2 ? 22 : 19, zeilenhoehe: 1.2)
+                .copyWith(color: blatt.tinte),
+          ),
+        );
+      case Blockart.bild:
+        final adresse = artikel.bilder[block.bildId];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: Mass.block),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Bild(adresse: adresse, format: 3 / 2, beschreibung: block.text),
+              // Bildunterschrift, wenn der Block einen Text trägt.
+              if (block.text.trim().isNotEmpty) ...[
+                const SizedBox(height: Mass.eng),
+                Text(
+                  block.text,
+                  style: Stil.meta.copyWith(color: blatt.tinteGedaempft),
+                ),
+              ],
+            ],
+          ),
+        );
+      case Blockart.zitat:
+        return Container(
+          margin: const EdgeInsets.only(bottom: Mass.block),
+          padding: const EdgeInsets.only(left: Mass.normal),
+          decoration: BoxDecoration(
+            border: Border(left: BorderSide(color: blatt.akzent, width: 3)),
+          ),
+          child: Text(
+            block.text,
+            style: Stil.lesetext.copyWith(
+              color: blatt.tinte,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        );
+      case Blockart.liste:
+        return Padding(
+          padding: const EdgeInsets.only(bottom: Mass.block),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final punkt in block.punkte)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: Mass.eng),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('•  ',
+                          style: Stil.lesetext.copyWith(color: blatt.akzent)),
+                      Expanded(
+                        child: Text(
+                          punkt,
+                          style: Stil.lesetext.copyWith(color: blatt.tinte),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        );
+      case Blockart.code:
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: Mass.block),
+          padding: const EdgeInsets.all(Mass.normal),
+          decoration: BoxDecoration(
+            color: blatt.papierVertieft,
+            borderRadius: BorderRadius.circular(Mass.rundung),
+          ),
+          child: Text(
+            block.text,
+            style: Stil.technisch.copyWith(color: blatt.tinte),
+          ),
+        );
+      case Blockart.absatz:
+      case Blockart.einbettung:
+      case Blockart.unbekannt:
+        // Einbettungen (Tweets, Videos) zeigt die App noch nicht als solche;
+        // trägt der Block einen Text, kommt er als Absatz, sonst gar nicht.
+        if (block.text.trim().isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: Mass.block),
+          child: Text(
+            block.text,
+            style: Stil.lesetext.copyWith(color: blatt.tinte),
+          ),
+        );
+    }
   }
 }

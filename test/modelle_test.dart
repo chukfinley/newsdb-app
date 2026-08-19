@@ -252,4 +252,64 @@ void main() {
       expect(fehlendeLager({'left': 3, 'center': 0, 'right': 2}), ['center']);
     });
   });
+
+  group('Artikel-Bausteine (blocks)', () {
+    test('Block-Arten werden aus der API-Kennung gelesen', () {
+      const grund = {
+        'id': 'a1', 'source_id': 'x', 'title': 'T', 'paywall': 'none',
+        'section': null, 'published_at': null, 'lead_image_id': null,
+        'truncated': false, 'word_count': 1,
+      };
+      final a = Artikel.vonJson({
+        ...grund,
+        'images': [
+          {'id': 'img1', 'url': 'https://haus.de/1.jpg'},
+        ],
+        'blocks': [
+          {'type': 'heading', 'level': 2, 'text': 'Zwischentitel'},
+          {'type': 'paragraph', 'text': 'Ein Absatz.'},
+          {'type': 'image', 'image_id': 'img1', 'text': 'Bildunterschrift'},
+          {'type': 'list', 'items': ['eins', 'zwei']},
+          {'type': 'quote', 'text': 'Ein Zitat.'},
+          {'type': 'zapf', 'text': 'unbekannter Typ'},
+        ],
+      });
+      expect(a.bloecke, hasLength(6));
+      expect(a.bloecke[0].art, Blockart.ueberschrift);
+      expect(a.bloecke[0].stufe, 2);
+      expect(a.bloecke[1].art, Blockart.absatz);
+      expect(a.bloecke[2].art, Blockart.bild);
+      expect(a.bloecke[3].punkte, ['eins', 'zwei']);
+      expect(a.bloecke[4].art, Blockart.zitat);
+      // Unbekannter Typ bricht nichts, wird zu `unbekannt`.
+      expect(a.bloecke[5].art, Blockart.unbekannt);
+    });
+
+    test('Bild-Blocks lösen ihre Kennung über die Bilder-Map auf', () {
+      final a = Artikel.vonJson({
+        'id': 'a1', 'source_id': 'x', 'title': 'T', 'paywall': 'none',
+        'section': null, 'published_at': null, 'lead_image_id': null,
+        'truncated': false, 'word_count': 1,
+        'images': [
+          {'id': 'abc', 'url': 'https://haus.de/gross.jpg'},
+        ],
+        'blocks': [
+          {'type': 'image', 'image_id': 'abc'},
+        ],
+      });
+      // Die Kennung ist im Block, die Adresse in der Map — nie über /api/images.
+      expect(a.bloecke.single.bildId, 'abc');
+      expect(a.bilder['abc'], 'https://haus.de/gross.jpg');
+    });
+
+    test('ohne blocks bleibt die Liste leer, Fließtext trägt', () {
+      final a = Artikel.vonJson({
+        'id': 'a1', 'source_id': 'x', 'title': 'T', 'paywall': 'none',
+        'section': null, 'published_at': null, 'lead_image_id': null,
+        'truncated': false, 'word_count': 1, 'text': 'Nur Fließtext.',
+      });
+      expect(a.bloecke, isEmpty);
+      expect(a.lesbar, 'Nur Fließtext.');
+    });
+  });
 }

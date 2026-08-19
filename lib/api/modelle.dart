@@ -348,6 +348,8 @@ class Artikel {
     this.abgeschnitten = false,
     this.woerter = 0,
     this.lesesekunden = 0,
+    this.bloecke = const [],
+    this.bilder = const {},
   });
 
   factory Artikel.vonJson(Map<String, dynamic> json) => Artikel(
@@ -358,6 +360,19 @@ class Artikel {
         hausName: json['source_name'] as String?,
         untertitel: json['subtitle'] as String?,
         vorspann: json['summary'] as String?,
+        bloecke: (json['blocks'] as List?)
+                ?.whereType<Map>()
+                .map((b) => Block.vonJson(b.cast<String, dynamic>()))
+                .toList() ??
+            const [],
+        // Kennung → Verlagsadresse, für die Bild-Blöcke. Aus `images[].url`,
+        // nie über `/api/images` (Token-Leck, siehe `_aufmacherbild`).
+        bilder: {
+          for (final b in (json['images'] as List?)?.whereType<Map>() ??
+              const <Map>[])
+            if (b['id'] is String && b['url'] is String)
+              b['id'] as String: b['url'] as String,
+        },
         kiZusammenfassung: json['ai_summary'] as String?,
         text: json['text'] as String?,
         textAnriss: json['text_anriss'] as String?,
@@ -411,6 +426,15 @@ class Artikel {
   final int woerter;
   final int lesesekunden;
 
+  /// Der Artikel in Bausteinen — Absätze, Zwischenüberschriften, Bilder,
+  /// Listen. Nur mit Abo (wie `text`). Reicher als der Fließtext, weil Bilder
+  /// an ihrer Stelle stehen und Überschriften den Text gliedern. Leer, wenn die
+  /// Stufe sie nicht liefert; dann fällt die Ansicht auf `lesbar` zurück.
+  final List<Block> bloecke;
+
+  /// Bildkennung → Verlagsadresse, für die Bild-Blöcke im Text.
+  final Map<String, String> bilder;
+
   /// Was von diesem Artikel gerade lesbar ist, in einem Feld — damit keine
   /// Ansicht die Reihenfolge selbst zusammenreimt.
   String? get lesbar => text ?? textAnriss ?? kiZusammenfassung ?? vorspann;
@@ -418,6 +442,67 @@ class Artikel {
   /// Steht hinter dem, was wir zeigen, noch mehr?
   bool get mehrDahinter => text == null && (textGekuerzt || abgeschnitten);
 }
+
+/// Ein Baustein des Artikels (`blocks[]`). Absatz, Überschrift, Bild, Zitat,
+/// Liste, Einbettung — die strukturierte Form des Textes.
+class Block {
+  const Block({
+    required this.art,
+    this.text = '',
+    this.stufe,
+    this.punkte = const [],
+    this.bildId,
+    this.einbettung,
+  });
+
+  factory Block.vonJson(Map<String, dynamic> json) => Block(
+        art: _blockart(json['type']),
+        text: json['text'] as String? ?? '',
+        stufe: (json['level'] as num?)?.toInt(),
+        punkte:
+            (json['items'] as List?)?.whereType<String>().toList() ?? const [],
+        bildId: json['image_id'] as String?,
+        einbettung: json['embed_url'] as String?,
+      );
+
+  final Blockart art;
+  final String text;
+
+  /// Überschriftsebene (1–3), nur bei `heading`.
+  final int? stufe;
+
+  /// Aufzählungspunkte, nur bei `list`.
+  final List<String> punkte;
+
+  /// Bildkennung, nur bei `image`. **Kennung, keine Adresse** — dasselbe wie
+  /// `lead_image_id`; die Ansicht löst sie über die Bildliste des Artikels auf,
+  /// nie über `/api/images` (das würde das Token an den Verlag leaken).
+  final String? bildId;
+
+  final String? einbettung;
+}
+
+enum Blockart {
+  absatz,
+  ueberschrift,
+  zitat,
+  liste,
+  bild,
+  einbettung,
+  code,
+  unbekannt;
+}
+
+Blockart _blockart(Object? wert) => switch (wert) {
+      'paragraph' => Blockart.absatz,
+      'heading' => Blockart.ueberschrift,
+      'quote' => Blockart.zitat,
+      'list' => Blockart.liste,
+      'image' => Blockart.bild,
+      'embed' => Blockart.einbettung,
+      'code' => Blockart.code,
+      _ => Blockart.unbekannt,
+    };
 
 /// Die Adresse des Aufmacherbilds eines Artikels.
 ///

@@ -48,6 +48,9 @@ flutter:
 
   assets:
     - assets/fonts/
+    # Das Marken-Logo als SVG (dasselbe wie im Web: news mit Kopfzeile). Gebuendelt,
+    # damit es maximal skaliert und nichts von aussen laedt. PNG-Kopie daneben.
+    - assets/brand/
 
   # Die vier Schriften des Blattes, dieselben wie im Web. Gebuendelt und nicht
   # von einem CDN geholt — aus demselben Grund wie dort: kein Abruf bei einem

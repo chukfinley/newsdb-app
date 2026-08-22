@@ -138,6 +138,32 @@ class Anmeldung extends ChangeNotifier {
   Convex _clientHolen() =>
       _client ??= Convex(deployment: Adressen.convex);
 
+  /// A259. Das im Konto gespeicherte Farbthema lesen (`light`/`dark`/`system`),
+  /// oder null wenn nichts gespeichert ist oder niemand angemeldet ist. Nutzt
+  /// den authentifizierten Convex-Client (`benutzer:aktuell`). Ein Fehler ist
+  /// kein Drama — dann bleibt es bei der lokalen bzw. hellen Wahl.
+  Future<String?> themaHolen() async {
+    if (_konto == null) return null;
+    try {
+      final antwort = await _clientHolen().query('benutzer:aktuell');
+      if (antwort is Map) return antwort['theme'] as String?;
+    } on Object catch (fehler) {
+      debugPrint('Thema holen: $fehler');
+    }
+    return null;
+  }
+
+  /// A259. Das Farbthema im Konto speichern, damit es dem Konto über Geräte
+  /// folgt (`konto:themeSetzen`). Ohne Anmeldung ein No-op.
+  Future<void> themaSpeichern(String thema) async {
+    if (_konto == null) return;
+    try {
+      await _clientHolen().mutation('konto:themeSetzen', {'theme': thema});
+    } on Object catch (fehler) {
+      debugPrint('Thema speichern: $fehler');
+    }
+  }
+
   /// Beim Start: liegt ein Refresh-Token vor, wird daraus eine Sitzung
   /// wiederhergestellt.
   ///

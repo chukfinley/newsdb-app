@@ -81,7 +81,7 @@ class _AnmeldeseiteState extends State<Anmeldeseite> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'newsdb',
+                        'Vielstimmig',
                         textAlign: TextAlign.center,
                         style: Stil.schlagzeile(38).copyWith(color: blatt.tinte),
                       ),

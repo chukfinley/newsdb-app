@@ -38,6 +38,10 @@ dependencies:
   # „vor 20 Minuten", Datumsformate auf Deutsch.
   intl: ^0.20.3
 
+  # Das Marken-Logo ist ein SVG (dasselbe wie im Web) — maximal skalierbar,
+  # gebuendelt aus assets/brand/. flutter_svg rendert es scharf in jeder Groesse.
+  flutter_svg: ^2.0.10
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

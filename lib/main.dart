@@ -15,7 +15,9 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api/client.dart';
 import 'auth/konto.dart';
@@ -47,9 +49,24 @@ class _NewsdbAppState extends State<NewsdbApp> {
   final _anmeldung = Anmeldung();
   late final NewsdbApi _api = NewsdbApi(anmeldung: _anmeldung);
 
-  /// Vorgabe ist die Einstellung des Geräts — dieselbe Haltung wie im Web, wo
-  /// `useTheme` mit `prefers-color-scheme` anfängt.
-  ThemeMode _modus = ThemeMode.system;
+  /// A259. Vorgabe ist **hell** — dieselbe Haltung wie im Web, wo der Gast die
+  /// helle Ausgabe bekommt. Die Wahl wird lokal gemerkt (`shared_preferences`)
+  /// und, sobald angemeldet, aus dem Konto übernommen (geräteübergreifend).
+  ThemeMode _modus = ThemeMode.light;
+
+  static const _themaSchluessel = "theme";
+
+  ThemeMode _modusVon(String s) => switch (s) {
+        "dark" => ThemeMode.dark,
+        "system" => ThemeMode.system,
+        _ => ThemeMode.light,
+      };
+
+  String _stringVon(ThemeMode m) => switch (m) {
+        ThemeMode.dark => "dark",
+        ThemeMode.system => "system",
+        ThemeMode.light => "light",
+      };
 
   /// Solange die gespeicherte Sitzung geprüft wird, ist weder „angemeldet" noch
   /// „nicht angemeldet" wahr. Ohne diesen dritten Zustand blitzt bei jedem
@@ -60,9 +77,22 @@ class _NewsdbAppState extends State<NewsdbApp> {
   void initState() {
     super.initState();
     _anmeldung.addListener(_geaendert);
-    _anmeldung.wiederherstellen().whenComplete(() {
-      if (mounted) setState(() => _laedt = false);
-    });
+    _start();
+  }
+
+  /// Start: erst die lokal gemerkte Themenwahl (Vorgabe hell), dann die Sitzung
+  /// wiederherstellen. Ist jemand angemeldet, **gewinnt das Konto** — die dort
+  /// gespeicherte Wahl gilt geräteübergreifend.
+  Future<void> _start() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lokal = prefs.getString(_themaSchluessel);
+    if (lokal != null) _modus = _modusVon(lokal);
+    await _anmeldung.wiederherstellen();
+    if (_anmeldung.angemeldet) {
+      final ausKonto = await _anmeldung.themaHolen();
+      if (ausKonto != null) _modus = _modusVon(ausKonto);
+    }
+    if (mounted) setState(() => _laedt = false);
   }
 
   void _geaendert() {
@@ -80,19 +110,22 @@ class _NewsdbAppState extends State<NewsdbApp> {
   void _umschalten() {
     final dunkel =
         MediaQuery.platformBrightnessOf(context) == Brightness.dark;
-    setState(() {
-      _modus = switch (_modus) {
-        ThemeMode.system => dunkel ? ThemeMode.light : ThemeMode.dark,
-        ThemeMode.light => ThemeMode.dark,
-        ThemeMode.dark => ThemeMode.light,
-      };
-    });
+    final naechster = switch (_modus) {
+      ThemeMode.system => dunkel ? ThemeMode.light : ThemeMode.dark,
+      ThemeMode.light => ThemeMode.dark,
+      ThemeMode.dark => ThemeMode.light,
+    };
+    setState(() => _modus = naechster);
+    // A259. Lokal merken und, wenn angemeldet, ins Konto speichern (No-op sonst).
+    final s = _stringVon(naechster);
+    SharedPreferences.getInstance().then((p) => p.setString(_themaSchluessel, s));
+    _anmeldung.themaSpeichern(s);
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'newsdb',
+      title: 'Vielstimmig',
       debugShowCheckedModeBanner: false,
       theme: tagesausgabe,
       darkTheme: nachtausgabe,
@@ -123,7 +156,11 @@ class _Vorhang extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('newsdb', style: Stil.schlagzeile(26)),
+            // A259. Das Marken-Logo als SVG — maximal skalierbar, gebündelt,
+            // kein externer Abruf. Dasselbe Zeichen wie im Web.
+            SvgPicture.asset('assets/brand/logo.svg', width: 96, height: 96),
+            const SizedBox(height: Mass.eng),
+            Text('Vielstimmig', style: Stil.schlagzeile(26)),
             const SizedBox(height: Mass.knapp),
             Text(
               'einen Moment …',
@@ -186,7 +223,7 @@ class Zeitung extends StatelessWidget {
     final dunkel = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
-        title: Text('newsdb', style: Stil.schlagzeile(22)),
+        title: Text('Vielstimmig', style: Stil.schlagzeile(22)),
         // Die Kopfzeile trägt die Haarlinie des Blattlayouts, nicht einen
         // Schatten: ein Schatten wäre Material, eine Linie ist Zeitung.
         bottom: PreferredSize(
